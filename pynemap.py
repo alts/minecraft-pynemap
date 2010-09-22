@@ -103,6 +103,8 @@ class Level(object):
     })
     base_block_colors = numpy.array([_base_block_colors.get(color, (255,255,255,0)) for color in range(255)], dtype=numpy.uint8)
     shaded_block_colors = base_block_colors >> 1
+    depth_block_colors = numpy.array([(255, 255, 255, 0)] + [(n*2, n*2, 255, 255) for n in xrange(128)])
+    index_vector = numpy.array([n for n in xrange(255)])
     color_depth = 4
     chunk_size_X = 16
     chunk_size_Z = 16
@@ -213,6 +215,29 @@ def render_topographic_chunk((chunk_file, map_size, render_options)):
     except IndexError, err:
         print 'Failed chunk: %s' % err
 
+def render_block_chunk((chunk_file, map_size, render_options)):
+    chunk = nbt.NBTFile(chunk_file, 'rb')
+    array_offset_X = (abs(map_size['x_min']) + chunk['Level']['xPos'].value) * Level.chunk_size_X
+    array_offset_Z = (abs(map_size['z_min']) + chunk['Level']['zPos'].value) * Level.chunk_size_Z
+
+    try:
+        blocks = numpy.fromstring(chunk['Level']['Blocks'].value, dtype=numpy.uint8).reshape(Level.chunk_size_X, Level.chunk_size_Z, Level.chunk_size_Y)
+        for y in xrange(Level.chunk_size_Y):
+            profile = Level.index_vector[blocks[...,y]]
+            profile = (profile == render_options['block']) * 1
+            colors = Level.depth_block_colors[profile * (y + 1)].reshape(
+                Level.chunk_size_X, Level.chunk_size_Z, Level.color_depth
+            )
+
+            image_array[array_offset_Z : array_offset_Z + Level.chunk_size_Z,
+                array_offset_X : array_offset_X + Level.chunk_size_X] = overlay_chunk(
+                    colors.swapaxes(0, 1),
+                    image_array[array_offset_Z : array_offset_Z + Level.chunk_size_Z,
+                        array_offset_X : array_offset_X + Level.chunk_size_X])
+        print 'Finished chunk %s' % str((array_offset_X, array_offset_Z))
+    except IndexError, err:
+        print 'Failed chunk: %s' % err
+
 
 def init_image_array(map_image_size, default_color=(0,0,0,0)):
     image_array = shmem.create((map_image_size[1], map_image_size[0], Level.color_depth), dtype=numpy.uint8)
@@ -283,6 +308,7 @@ render_modes = dict({
     'overhead':     render_overhead_chunk,
     #'oblique':      render_oblique_chunk,
     'topographic':  render_topographic_chunk,
+    'block':        render_block_chunk
 })
 
 if __name__ == '__main__':
@@ -295,6 +321,7 @@ if __name__ == '__main__':
             'output-file=',
             'render-mode=',
             'processes=',
+            'block=',
             'verbose',
         ]
         options = dict({
@@ -307,6 +334,7 @@ if __name__ == '__main__':
         render_options = dict({
             'slices':None,
             'blocks':None,
+            'block': 0
         })
 
         try:
@@ -328,6 +356,8 @@ if __name__ == '__main__':
                     options['verbose'] = True
                 elif opt == '--processes':
                     options['processes'] = max(int(arg), 1)
+                elif opt == '--block':
+                    render_options['block'] = arg
                 else:
                     pass
         except getopt.GetoptError, error:
