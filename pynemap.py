@@ -224,7 +224,10 @@ def render_block_chunk((chunk_file, map_size, render_options)):
         blocks = numpy.fromstring(chunk['Level']['Blocks'].value, dtype=numpy.uint8).reshape(Level.chunk_size_X, Level.chunk_size_Z, Level.chunk_size_Y)
         for y in xrange(Level.chunk_size_Y):
             profile = Level.index_vector[blocks[...,y]]
-            profile = (profile == render_options['block']) * 1
+            components = [profile * 0]
+            for block_id in render_options['blocks']:
+                components.append((profile == int(block_id)) * 1)
+            profile = sum(components)
             colors = Level.depth_block_colors[profile * (y + 1)].reshape(
                 Level.chunk_size_X, Level.chunk_size_Z, Level.color_depth
             )
@@ -321,7 +324,7 @@ if __name__ == '__main__':
             'output-file=',
             'render-mode=',
             'processes=',
-            'block=',
+            'only_blocks=',
             'verbose',
         ]
         options = dict({
@@ -334,7 +337,6 @@ if __name__ == '__main__':
         render_options = dict({
             'slices':None,
             'blocks':None,
-            'block': 0
         })
 
         try:
@@ -356,8 +358,8 @@ if __name__ == '__main__':
                     options['verbose'] = True
                 elif opt == '--processes':
                     options['processes'] = max(int(arg), 1)
-                elif opt == '--block':
-                    render_options['block'] = arg
+                elif opt == '--only_blocks':
+                    render_options['blocks'] = arg.split(',')
                 else:
                     pass
         except getopt.GetoptError, error:
