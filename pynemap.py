@@ -6,6 +6,24 @@ import numpy, shmem
 import multiprocessing
 import itertools
 
+def _topographic_values(k):
+    if k == 8 or k == 9:
+        k = -1
+    elif k > 0:
+        k = 1
+    return k
+
+def _hypsometric_values(k):
+    result = [0, 0, 0, 255]
+    if k > 63:
+        result[0] = 255
+        result[1] = 255 - (k - 64) * 4
+    else:
+        result[1] = 255
+        result[0] = k * 4
+
+    return numpy.array(result)
+
 class LevelException(Exception):
     def __init__(self, err_msg):
         self.msg = err_msg
@@ -105,6 +123,11 @@ class Level(object):
     shaded_block_colors = base_block_colors >> 1
     depth_block_colors = numpy.array([(255, 255, 255, 0)] + [(n*2, n*2, 255, 255) for n in xrange(128)])
     index_vector = numpy.array([n for n in xrange(255)])
+    topographic_translator = numpy.array([_topographic_values(n) for n in xrange(255)])
+    topographic_colors = numpy.array(
+        [(255, 255, 255, 0), (0, 0, 255, 30)] +
+        [_hypsometric_values(n) for n in xrange(128)]
+    )
     color_depth = 4
     chunk_size_X = 16
     chunk_size_Z = 16
@@ -192,7 +215,6 @@ def render_oblique_chunk((chunk_file, map_size, render_options)):
         print 'Failed chunk: %s' % err
 
 def render_topographic_chunk((chunk_file, map_size, render_options)):
-    import topography
     chunk = nbt.NBTFile(chunk_file, 'rb')
     array_offset_X = (abs(map_size['x_min']) + chunk['Level']['xPos'].value) * Level.chunk_size_X
     array_offset_Z = (abs(map_size['z_min']) + chunk['Level']['zPos'].value) * Level.chunk_size_Z
@@ -200,9 +222,9 @@ def render_topographic_chunk((chunk_file, map_size, render_options)):
     try:
         blocks = numpy.fromstring(chunk['Level']['Blocks'].value, dtype=numpy.uint8).reshape(Level.chunk_size_X, Level.chunk_size_Z, Level.chunk_size_Y)
         for y in xrange(Level.chunk_size_Y):
-            profile = topography.translator[blocks[...,y]]
+            profile = Level.topographic_translator[blocks[...,y]]
             water = (profile == -1) * 1
-            colors = topography.topographic_colors[((profile + water) * (y + 2)) + water].reshape(
+            colors = Level.topographic_colors[((profile + water) * (y + 2)) + water].reshape(
                 Level.chunk_size_X, Level.chunk_size_Z, Level.color_depth
             )
 
