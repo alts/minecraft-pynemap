@@ -31,7 +31,7 @@ class LevelException(Exception):
         return self.msg
 
 class Level(object):
-    _base_block_colors = dict({
+    _base_block_colors = {
         0:(255,255,255,0),          #air
         1:(120,120,120,255),        #stone
         2:(117,176,73,255),         #grass
@@ -118,7 +118,7 @@ class Level(object):
         83:(193,234,150,255),       #reeds
         84:(107,71,50,255),         #jukebox
         85:(157,128,79,191),        #fence
-    })
+    }
     base_block_colors = numpy.array([_base_block_colors.get(color, (255,255,255,0)) for color in range(255)], dtype=numpy.uint8)
     shaded_block_colors = base_block_colors >> 1
     depth_block_colors = numpy.array([(255, 255, 255, 0)] + [(n*2, n*2, 255, 255) for n in xrange(128)])
@@ -150,12 +150,12 @@ class Level(object):
             key=lambda chunk_file: int(os.path.basename(chunk_file).split('.')[2],36)
         )
         self.chunk_count = len(self.chunk_files)
-        self.level_size = dict({
+        self.level_size = {
             'x_min':0,
             'x_max':0,
             'z_min':0,
             'z_max':0,
-        })
+        }
         chunks_xpos = map(lambda chunk_file: int(os.path.basename(chunk_file).split('.')[1],36), self.chunk_files)
         chunks_zpos = map(lambda chunk_file: int(os.path.basename(chunk_file).split('.')[2],36), self.chunk_files)
         self.level_size['x_min'] = min(chunks_xpos)
@@ -329,12 +329,12 @@ def overlay_pixel(src, dst):
         dtype=numpy.uint8)
     return pixel
 
-render_modes = dict({
+render_modes = {
     'overhead':     render_overhead_chunk,
     #'oblique':      render_oblique_chunk,
     'topographic':  render_topographic_chunk,
     'block':        render_block_chunk
-})
+}
 
 if __name__ == '__main__':
     import getopt, sys
@@ -349,17 +349,17 @@ if __name__ == '__main__':
             'only_blocks=',
             'verbose',
         ]
-        options = dict({
+        options = {
             'level-file':None,
             'render-mode':'overhead',
             'output-file':'map.png',
             'verbose':False,
             'processes':multiprocessing.cpu_count(),
-        })
-        render_options = dict({
+        }
+        render_options = {
             'slices':None,
             'blocks':None,
-        })
+        }
 
         try:
             opts, args = getopt.gnu_getopt(sys.argv[1:], short_options, long_options)
