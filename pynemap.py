@@ -197,9 +197,34 @@ def render_oblique_chunk((chunk_file, map_size, render_options)):
 
     try:
         blocks = numpy.fromstring(chunk['Level']['Blocks'].value, dtype=numpy.uint8).reshape(Level.chunk_size_X, Level.chunk_size_Z, Level.chunk_size_Y)
+
+        for y in range(Level.chunk_size_Y):
+            base_colors = Level.base_block_colors[blocks[...,y]].reshape(Level.chunk_size_X, Level.chunk_size_Z, Level.color_depth)
+            shaded_colors = Level.shaded_block_colors[blocks[...,y]].reshape(Level.chunk_size_X, Level.chunk_size_Z, Level.color_depth)
+            colors = (shaded_colors, base_colors)
+
+            for i, coloring in enumerate(colors):
+                try:
+                    image_array[Level.chunk_size_Y + array_offset_Z - y + 1 - i: Level.chunk_size_Y + array_offset_Z + Level.chunk_size_Z - y + 1 - i,
+                        array_offset_X : array_offset_X + Level.chunk_size_X] = overlay_chunk(
+                            coloring.swapaxes(0, 1),
+                            image_array[Level.chunk_size_Y + array_offset_Z - y + 1 - i: Level.chunk_size_Y + array_offset_Z + Level.chunk_size_Z - y + 1 - i,
+                                array_offset_X : array_offset_X + Level.chunk_size_X])
+                except ValueError:
+                    print 'bad'
+        print 'Finished chunk %s' % str((array_offset_X, array_offset_Z))
+    except IndexError, err:
+        print 'Failed chunk: %s' % err
+
+def render_oblique_chunk_old((chunk_file, map_size, render_options)):
+    chunk = nbt.NBTFile(chunk_file, 'rb')
+    array_offset_X = (abs(map_size['x_min']) + chunk['Level']['xPos'].value) * Level.chunk_size_X
+    array_offset_Z = (abs(map_size['z_min']) + chunk['Level']['zPos'].value) * Level.chunk_size_Z
+
+    try:
+        blocks = numpy.fromstring(chunk['Level']['Blocks'].value, dtype=numpy.uint8).reshape(Level.chunk_size_X, Level.chunk_size_Z, Level.chunk_size_Y)
         new_chunk_pixels = image_array[array_offset_Z : array_offset_Z + Level.chunk_size_Z * 2 + Level.chunk_size_Y,
             array_offset_X : array_offset_X + Level.chunk_size_X]
-
         for y in range(Level.chunk_size_Y):
             colors = Level.base_block_colors[blocks[...,y]].reshape(Level.chunk_size_X, Level.chunk_size_Z, Level.color_depth)
             shaded_colors = Level.base_block_colors[blocks[...,y]].reshape(Level.chunk_size_X, Level.chunk_size_Z, Level.color_depth)
@@ -211,6 +236,7 @@ def render_oblique_chunk((chunk_file, map_size, render_options)):
                     pass
         image_array[array_offset_Z : array_offset_Z + Level.chunk_size_Z * 2 + Level.chunk_size_Y,
             array_offset_X : array_offset_X + Level.chunk_size_X] = new_chunk_pixels
+        print 'Finished chunk %s' % str((array_offset_X, array_offset_Z))
     except IndexError, err:
         print 'Failed chunk: %s' % err
 
@@ -312,26 +338,25 @@ def overlay_chunk(src_chunk, dest_chunk):
 def overlay_pixel(src, dst):
     pixel = numpy.array([
         #RED
-        ((src[3] * src[0] * dst[3])/255**2) +
-        ((src[0] * (255 - dst[3]))/255    ) +
-        ((dst[0] * dst[3] * (255 - src[3]))/255**2),
+        ((1 * src[3] * src[0] * dst[3])/255**2) +
+        ((1 * src[0] * (255 - dst[3]))/255    ) +
+        ((1 * dst[0] * dst[3] * (255 - src[3]))/255**2),
         #GREEN
-        ((src[3] * src[1] * dst[3])/255**2) +
-        ((src[1] * (255 - dst[3]))/255    ) +
-        ((dst[1] * dst[3] * (255 - src[3]))/255**2),
+        ((1 * src[3] * src[1] * dst[3])/255**2) +
+        ((1 * src[1] * (255 - dst[3]))/255    ) +
+        ((1 * dst[1] * dst[3] * (255 - src[3]))/255**2),
         #BLUE
-        ((src[3] * src[2] * dst[3])/255**2) +
-        ((src[2] * (255 - dst[3]))/255    ) +
-        ((dst[2] * dst[3] * (255 - src[3]))/255**2),
+        ((1 * src[3] * src[2] * dst[3])/255**2) +
+        ((1 * src[2] * (255 - dst[3]))/255    ) +
+        ((1 * dst[2] * dst[3] * (255 - src[3]))/255**2),
         #ALPHA
-        (src[3] * dst[3]         )/255    + (src[3] * (255 - dst[3]))/255 + (dst[3] * (255 - src[3])/255)
-        ],
-        dtype=numpy.uint8)
+        (1 *src[3] * dst[3])/255 + (1 * src[3] * (255 - dst[3]))/255 + (1 *dst[3] * (255 - src[3])/255)
+    ], dtype=numpy.uint8)
     return pixel
 
 render_modes = {
     'overhead':     render_overhead_chunk,
-    #'oblique':      render_oblique_chunk,
+    'oblique':      render_oblique_chunk,
     'topographic':  render_topographic_chunk,
     'block':        render_block_chunk
 }
